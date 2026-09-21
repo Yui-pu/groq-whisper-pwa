@@ -86,10 +86,13 @@
                 testKeyResult.textContent = '🔄 Groq APIへ接続テスト中...';
                 testKeyResult.style.color = '#fdcb6e';
                 try {
-                    const resp = await fetch('https://api.groq.com/openai/v1/models', {
+                    const isGithub = window.location.hostname.includes('github.io');
+                    const modelsUrl = isGithub 
+                        ? 'https://api.groq.com/openai/v1/models' 
+                        : '/api/models';
+
+                    const resp = await fetch(modelsUrl, {
                         method: 'GET',
-                        mode: 'cors',
-                        credentials: 'omit',
                         headers: { 'Authorization': `Bearer ${key}` },
                     });
                     if (resp.ok) {
@@ -247,10 +250,13 @@
                     groqData.append('language', state.settings.language);
                 }
 
-                resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+                const isGithub = window.location.hostname.includes('github.io');
+                const apiUrl = isGithub 
+                    ? 'https://api.groq.com/openai/v1/audio/transcriptions'
+                    : '/api/transcribe';
+
+                resp = await fetch(apiUrl, {
                     method: 'POST',
-                    mode: 'cors',
-                    credentials: 'omit',
                     headers: {
                         'Authorization': `Bearer ${cleanKey}`,
                     },
