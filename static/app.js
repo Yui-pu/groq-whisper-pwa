@@ -73,6 +73,39 @@
                 }
             });
         }
+        const btnTestKey = $('btnTestKey');
+        const testKeyResult = $('testKeyResult');
+        if (btnTestKey && testKeyResult) {
+            btnTestKey.addEventListener('click', async () => {
+                const key = (inputApiKey.value || state.settings.apiKey || '').replace(/[^\x21-\x7E]/g, '');
+                if (!key) {
+                    testKeyResult.textContent = '❌ 先にGroq APIキーを入力してください';
+                    testKeyResult.style.color = '#ff7675';
+                    return;
+                }
+                testKeyResult.textContent = '🔄 Groq APIへ接続テスト中...';
+                testKeyResult.style.color = '#fdcb6e';
+                try {
+                    const resp = await fetch('https://api.groq.com/openai/v1/models', {
+                        method: 'GET',
+                        mode: 'cors',
+                        credentials: 'omit',
+                        headers: { 'Authorization': `Bearer ${key}` },
+                    });
+                    if (resp.ok) {
+                        testKeyResult.textContent = '✅ 接続成功！通信可能です';
+                        testKeyResult.style.color = '#55efc4';
+                    } else {
+                        const data = await resp.json().catch(() => ({}));
+                        testKeyResult.textContent = `❌ 認証失敗 (${resp.status}): ${data.error?.message || 'キーが無効です'}`;
+                        testKeyResult.style.color = '#ff7675';
+                    }
+                } catch (err) {
+                    testKeyResult.textContent = `❌ 通信遮断 (${err.name}): ${err.message}`;
+                    testKeyResult.style.color = '#ff7675';
+                }
+            });
+        }
         settingsModal.addEventListener('click', (e) => {
             if (e.target === settingsModal) closeSettings();
         });

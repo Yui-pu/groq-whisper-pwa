@@ -118,6 +118,8 @@
                         <option value="auto">自動検出</option>
                     </select>
                 </div>
+                <button id="btnTestKey" type="button" style="width: 100%; margin-bottom: 12px; background: rgba(108, 92, 231, 0.2); border: 1px solid #6c5ce7; color: #a29bfe; padding: 10px; border-radius: 8px; font-weight: 500; cursor: pointer;">⚡ Groq API接続テスト</button>
+                <div id="testKeyResult" style="margin-bottom: 12px; font-size: 13px; text-align: center; min-height: 20px; font-weight: 500;"></div>
                 <button id="btnSaveSettings" class="save-btn">設定を保存</button>
                 <button id="btnClearCache" type="button" style="margin-top: 14px; width: 100%; background: transparent; border: 1px solid rgba(255,100,100,0.3); color: #ff7675; border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer;">🔄 アプリを初期化・キャッシュ全消去</button>
                 <p class="setting-note">🔒 APIキーはこの端末内にのみ保存され、Groq APIへの送信のみに使用されます</p>
@@ -125,6 +127,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
 </body>
 </html>
