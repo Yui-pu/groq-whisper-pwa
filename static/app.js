@@ -422,9 +422,20 @@
         return div.innerHTML;
     }
 
-    // === Service Worker登録 ===
+    // === 悪さをする古いService Workerとキャッシュの強制解除 ===
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (let reg of registrations) {
+                reg.unregister();
+            }
+        }).catch(() => {});
+    }
+    if ('caches' in window) {
+        caches.keys().then(keys => {
+            for (let key of keys) {
+                caches.delete(key);
+            }
+        }).catch(() => {});
     }
 
     // === 起動 ===
