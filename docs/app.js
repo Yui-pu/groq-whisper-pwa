@@ -200,7 +200,8 @@
 
         try {
             let resp;
-            if (state.settings.apiKey) {
+            const cleanKey = (state.settings.apiKey || '').replace(/[^\x21-\x7E]/g, '');
+            if (cleanKey) {
                 // APIキーが設定されている場合: Groq公式APIに直接リクエスト (最速・サーバーレス対応)
                 const groqData = new FormData();
                 if (audioFile instanceof File) {
@@ -215,8 +216,10 @@
 
                 resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
                     method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
                     headers: {
-                        'Authorization': `Bearer ${state.settings.apiKey.trim()}`,
+                        'Authorization': `Bearer ${cleanKey}`,
                     },
                     body: groqData,
                 });
@@ -261,11 +264,7 @@
             }
         } catch (err) {
             console.error('Transcription error:', err);
-            let msg = err.message || '通信エラー';
-            if (msg.includes('Load failed') || msg.includes('Failed to fetch') || msg.includes('fail to fetch')) {
-                msg = '通信に失敗しました。設定内の「アプリを初期化・キャッシュ全消去」をお試しください';
-            }
-            showToast(`❌ ${msg}`);
+            showToast(`❌ ${err.name || 'Error'}: ${err.message || '通信エラー'}`);
         } finally {
             state.isProcessing = false;
             updateUI();
