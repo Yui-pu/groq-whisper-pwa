@@ -158,18 +158,11 @@
         }
 
         const ext = state.mediaRecorder.mimeType.includes('webm') ? 'webm' : 'm4a';
-        const formData = new FormData();
-        formData.append('file', blob, `audio.${ext}`);
-        formData.append('model', state.settings.model);
-        formData.append('language', state.settings.language);
-        if (state.settings.apiKey) {
-            formData.append('api_key', state.settings.apiKey);
-        }
 
         try {
             let resp;
             if (state.settings.apiKey) {
-                // APIキーが端末に設定されている場合: Groq公式APIに直接リクエスト (最速・サーバーレス完全対応)
+                // APIキーが設定されている場合: Groq公式APIに直接リクエスト (最速・サーバーレス対応)
                 const groqData = new FormData();
                 groqData.append('file', blob, `audio.${ext}`);
                 groqData.append('model', state.settings.model || 'whisper-large-v3-turbo');
@@ -180,26 +173,42 @@
                 resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${state.settings.apiKey}`,
+                        'Authorization': `Bearer ${state.settings.apiKey.trim()}`,
                     },
                     body: groqData,
                 });
             } else {
-                // サーバー経由 (FastAPI の環境変数 GROQ_API_KEY を使用)
-                const formData = new FormData();
-                formData.append('file', blob, `audio.${ext}`);
-                formData.append('model', state.settings.model);
-                formData.append('language', state.settings.language);
-                resp = await fetch('/api/transcribe', { method: 'POST', body: formData });
+                // APIキー未設定の場合: ローカルサーバーがあれば中継、なければ設定を促す
+                try {
+                    const health = await fetch('./api/health');
+                    if (health.ok) {
+                        const formData = new FormData();
+                        formData.append('file', blob, `audio.${ext}`);
+                        formData.append('model', state.settings.model);
+                        formData.append('language', state.settings.language);
+                        resp = await fetch('./api/transcribe', { method: 'POST', body: formData });
+                    } else {
+                        throw new Error('No local server');
+                    }
+                } catch (_) {
+                    showToast('⚙️ 右上の設定からGroq APIキーを入力してください');
+                    openSettings();
+                    return;
+                }
             }
 
-            const data = await resp.json();
-
             if (!resp.ok) {
-                const errMsg = data.error?.message || data.detail || 'APIエラーが発生しました';
+                let errMsg = 'APIエラーが発生しました';
+                try {
+                    const errData = await resp.json();
+                    errMsg = errData.error?.message || errData.detail || `エラー (${resp.status})`;
+                } catch (_) {
+                    errMsg = `HTTPエラー (${resp.status}): 通信に失敗しました`;
+                }
                 throw new Error(errMsg);
             }
 
+            const data = await resp.json();
             const text = (data.text || '').trim();
             if (text) {
                 showResult(text);

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'groq-whisper-v2';
+const CACHE_NAME = 'groq-whisper-v3';
 const ASSETS = ['./', 'styles.css', 'app.js', 'manifest.json'];
 
 self.addEventListener('install', (e) => {
@@ -14,7 +14,10 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-    if (e.request.url.includes('/api/')) return; // API はキャッシュしない
+    // GET 以外（POSTなど）や外部URL（Groq API等）は絶対にインターセプトしない
+    if (e.request.method !== 'GET') return;
+    if (!e.request.url.startsWith(self.location.origin)) return;
+
     e.respondWith(
         caches.match(e.request).then(r => r || fetch(e.request))
     );
