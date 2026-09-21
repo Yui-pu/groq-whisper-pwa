@@ -86,10 +86,7 @@
                 testKeyResult.textContent = '🔄 Groq APIへ接続テスト中...';
                 testKeyResult.style.color = '#fdcb6e';
                 try {
-                    const isGithub = window.location.hostname.includes('github.io');
-                    const modelsUrl = isGithub 
-                        ? 'https://api.groq.com/openai/v1/models' 
-                        : '/api/models';
+                    const modelsUrl = 'https://groq-whisper-pwa.vercel.app/api/models';
 
                     const resp = await fetch(modelsUrl, {
                         method: 'GET',
@@ -250,10 +247,7 @@
                     groqData.append('language', state.settings.language);
                 }
 
-                const isGithub = window.location.hostname.includes('github.io');
-                const apiUrl = isGithub 
-                    ? 'https://api.groq.com/openai/v1/audio/transcriptions'
-                    : '/api/transcribe';
+                const apiUrl = 'https://groq-whisper-pwa.vercel.app/api/transcribe';
 
                 resp = await fetch(apiUrl, {
                     method: 'POST',
