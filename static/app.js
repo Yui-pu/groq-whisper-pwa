@@ -57,6 +57,22 @@
         btnSaveSettings.addEventListener('click', saveSettings);
         btnToggleKey.addEventListener('click', toggleKeyVisibility);
         btnClearHistory.addEventListener('click', clearHistory);
+        const btnClearCache = $('btnClearCache');
+        if (btnClearCache) {
+            btnClearCache.addEventListener('click', async () => {
+                if (confirm('Service Workerとキャッシュを全消去してアプリを再読み込みしますか？')) {
+                    if ('serviceWorker' in navigator) {
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        for (const r of regs) await r.unregister();
+                    }
+                    if ('caches' in window) {
+                        const keys = await caches.keys();
+                        for (const k of keys) await caches.delete(k);
+                    }
+                    window.location.reload(true);
+                }
+            });
+        }
         settingsModal.addEventListener('click', (e) => {
             if (e.target === settingsModal) closeSettings();
         });
@@ -100,19 +116,30 @@
     async function startRecording() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: { sampleRate: 44100, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+                audio: { echoCancellation: true, noiseSuppression: true }
             });
 
-            // WebM (Chrome/Android) を優先
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? 'audio/webm;codecs=opus'
-                : 'audio/mp4';
+            // MIMEタイプの判定 (iOS Safari は audio/mp4、Chrome/Android は audio/webm)
+            let chosenMime = '';
+            if (typeof MediaRecorder.isTypeSupported === 'function') {
+                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                    chosenMime = 'audio/webm;codecs=opus';
+                } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                    chosenMime = 'audio/webm';
+                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    chosenMime = 'audio/mp4';
+                }
+            }
 
-            state.mediaRecorder = new MediaRecorder(stream, { mimeType });
+            state.currentMimeType = chosenMime;
+            state.mediaRecorder = chosenMime
+                ? new MediaRecorder(stream, { mimeType: chosenMime })
+                : new MediaRecorder(stream);
+
             state.audioChunks = [];
 
             state.mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) state.audioChunks.push(e.data);
+                if (e.data && e.data.size > 0) state.audioChunks.push(e.data);
             };
 
             state.mediaRecorder.onstop = () => {
@@ -120,7 +147,8 @@
                 processAudio();
             };
 
-            state.mediaRecorder.start(250); // 250msごとにチャンク
+            // iOS Safari の音声破損バグ防止のため timeslice を指定せず開始
+            state.mediaRecorder.start();
             state.isRecording = true;
             state.recordingStartTime = Date.now();
             updateUI();
@@ -148,23 +176,38 @@
 
     // === 音声処理・API送信 ===
     async function processAudio() {
-        const blob = new Blob(state.audioChunks, { type: state.mediaRecorder.mimeType });
+        const mime = state.currentMimeType || state.mediaRecorder?.mimeType || 'audio/webm';
+        const blob = new Blob(state.audioChunks, { type: mime });
 
-        if (blob.size < 1000) {
+        if (blob.size < 500) {
             state.isProcessing = false;
             updateUI();
             showToast('⚠️ 録音が短すぎます');
             return;
         }
 
-        const ext = state.mediaRecorder.mimeType.includes('webm') ? 'webm' : 'm4a';
+        const isWebm = mime.includes('webm');
+        const ext = isWebm ? 'webm' : 'm4a';
+        const fileType = isWebm ? 'audio/webm' : 'audio/mp4';
+        
+        // iOS Safari の FormData multipart 不正対策として File オブジェクトを明示生成
+        let audioFile;
+        try {
+            audioFile = new File([blob], `audio.${ext}`, { type: fileType });
+        } catch (_) {
+            audioFile = blob;
+        }
 
         try {
             let resp;
             if (state.settings.apiKey) {
                 // APIキーが設定されている場合: Groq公式APIに直接リクエスト (最速・サーバーレス対応)
                 const groqData = new FormData();
-                groqData.append('file', blob, `audio.${ext}`);
+                if (audioFile instanceof File) {
+                    groqData.append('file', audioFile);
+                } else {
+                    groqData.append('file', audioFile, `audio.${ext}`);
+                }
                 groqData.append('model', state.settings.model || 'whisper-large-v3-turbo');
                 if (state.settings.language && state.settings.language !== 'auto') {
                     groqData.append('language', state.settings.language);
@@ -218,7 +261,11 @@
             }
         } catch (err) {
             console.error('Transcription error:', err);
-            showToast(`❌ ${err.message}`);
+            let msg = err.message || '通信エラー';
+            if (msg.includes('Load failed') || msg.includes('Failed to fetch') || msg.includes('fail to fetch')) {
+                msg = '通信に失敗しました。設定内の「アプリを初期化・キャッシュ全消去」をお試しください';
+            }
+            showToast(`❌ ${msg}`);
         } finally {
             state.isProcessing = false;
             updateUI();
